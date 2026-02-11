@@ -1,14 +1,14 @@
-=== Import Settings into WordPress SEO Plugin – Rank Math ===
+=== WP All Import – Import SEO Settings for Rank Math SEO ===
 Contributors: soflyy, wpallimport
-Tags: seo, import seo, search engine optimization, import search engine optimization, import rankmath, rankmath seo, rankmath wordpress seo, import rankmath wordpress seo, rank math, rankmath
+Tags: seo, import seo, search engine optimization, import search engine optimization, import rankmath
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 4.9
 Requires PHP: 5.6
-Tested up to: 6.7
+Tested up to: 6.9
 Stable tag: 1.1
 
-Easily import SEO settings from any XML or CSV file to WordPress SEO Plugin – Rank Math with the Rank Math Add-On for WP All Import.
+Drag & drop to import from any CSV, Excel, XML, or Google Sheets file into Rank Math SEO's titles, meta descriptions, focus keywords, schema settings and more.
 
 == Description ==
 
