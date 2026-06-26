@@ -8,7 +8,7 @@ if( !class_exists('WPAI_RankMath_SEO_Importer')) {
         protected $post_type;
         protected $schema;
 
-        public function __construct( \Soflyy\WpAllImportRapidAddon\RapidAddon $addon_obj )
+        public function __construct( RapidAddon $addon_obj )
         {
             $this->add_on = $addon_obj;
             $helpers = new WPAI_RankMath_SEO_Helpers();
@@ -180,7 +180,7 @@ if( !class_exists('WPAI_RankMath_SEO_Importer')) {
                                         $temp[$i]['isbn'] = array_key_exists($i, $field_vals['isbn']) ? $field_vals['isbn'][$i] : '';
                                         $temp[$i]['url'] = array_key_exists($i, $field_vals['url']) ? $field_vals['url'][$i] : '';
                                         $temp[$i]['author'] = array_key_exists($i, $field_vals['author']) ? $field_vals['author'][$i] : '';
-                                        $temp[$i]['date_published'] = array_key_exists($i, $field_vals['date']) ? date('Y-m-d', strtotime($field_vals['date'][$i])) : '';
+                                        $temp[$i]['date_published'] = ( array_key_exists($i, $field_vals['date']) && !empty($field_vals['date'][$i]) ) ? date('Y-m-d', strtotime($field_vals['date'][$i])) : '';
 
 
                                     }
@@ -199,6 +199,10 @@ if( !class_exists('WPAI_RankMath_SEO_Importer')) {
                                 case 'rank_math_snippet_product_price_valid':
                                 case 'rank_math_snippet_recipe_video_date':
 
+                                    // Skip empty values so we don't store a 1970-01-01 epoch date.
+                                    if( empty($value) ){
+                                        break;
+                                    }
                                     $date = date(DATE_ATOM, strtotime($value));
                                     $this->update_meta($post_id, $field, $date);
                                     break;
@@ -254,17 +258,22 @@ if( !class_exists('WPAI_RankMath_SEO_Importer')) {
                                 case 'rank_math_snippet_local_opens':
                                 case 'rank_math_snippet_local_closes':
 
+                                    // Skip empty values so we don't store a 12:00 AM epoch time.
+                                    if( empty($value) ){
+                                        break;
+                                    }
                                     $time = date("h:i A", strtotime($value));
                                     $this->update_meta($post_id, $field, $time);
                                     break;
 
-                                case 'rank_math_primary_product_cat':
+                                case (!!preg_match('/^rank_math_primary_/', $field)):
                                     if( !empty($value)) {
-                                        // save the value for processing in the saved_post hook
-                                        $this->update_meta($post_id, 'rank_math_product_cat_temp', $value);
+                                        // Stash the raw value; resolve it to a term ID once the post and
+                                        // its terms are saved, via pmxi_saved_post. The taxonomy is encoded
+                                        // in the field name (rank_math_primary_{taxonomy}).
+                                        $this->update_meta($post_id, $field . '_temp', $value);
 
-                                        // Set filter for further processing.
-                                        add_filter( 'pmxi_saved_post', [$this, 'product_cat'], 10, 3);
+                                        add_filter( 'pmxi_saved_post', [$this, 'set_primary_terms'], 10, 3);
                                     }
                                     break;
 
@@ -362,37 +371,50 @@ if( !class_exists('WPAI_RankMath_SEO_Importer')) {
             }
         }
 
-        public function product_cat( $post_id, $xml_node, $is_update ){
-            // Retrieve value
-            $value = $this->get_meta($post_id, 'rank_math_product_cat_temp', true);
+        public function set_primary_terms( $post_id, $xml_node, $is_update ){
 
-            // Only process if there's a value.
-            if(!empty($value)) {
-                // Set field
-                $field = 'rank_math_primary_product_cat';
+            global $wpdb;
 
-                // Check if a valid term ID was provided
-                $is_term = get_term_by('id', $value, 'product_cat');
+            // Find every stashed primary-term value for this post. Reading from postmeta
+            // (rather than instance state) is deliberate: a separate filter is registered
+            // per record, and they all fire on each saved post, so the value must be keyed
+            // to the post being saved.
+            $like = $wpdb->esc_like('rank_math_primary_') . '%' . $wpdb->esc_like('_temp');
+            $rows = $wpdb->get_results( $wpdb->prepare("SELECT meta_key, meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key LIKE %s", $post_id, $like), ARRAY_A );
 
-                if ($is_term !== false) {
-                    $this->update_meta($post_id, $field, $value);
-                } else {
-                    // Check if the term is found by name.
-                    $is_name = get_term_by('name', $value, 'product_cat');
-                    if ($is_name !== false) {
-                        $this->update_meta($post_id, $field, $is_name->term_id);
-                    } else {
-                        // Check if the term is found by slug.
-                        $is_slug = get_term_by('slug', $value, 'product_cat');
-                        if ($is_slug !== false) {
-                            $this->update_meta($post_id, $field, $is_slug->term_id);
-                        }
+            foreach( (array) $rows as $row ){
+                $temp_key = $row['meta_key'];
+                $value    = $row['meta_value'];
+                $field    = preg_replace('/_temp$/', '', $temp_key);          // rank_math_primary_{taxonomy}
+                $taxonomy = preg_replace('/^rank_math_primary_/', '', $field);
+
+                if( !empty($value) && taxonomy_exists($taxonomy) ){
+                    $term_id = $this->resolve_term($value, $taxonomy);
+                    if( $term_id ){
+                        update_post_meta($post_id, $field, $term_id);
                     }
+                }
+
+                // Remove the temporary value.
+                delete_post_meta($post_id, $temp_key);
+            }
+        }
+
+        /**
+         * Resolve a primary-term value (term ID, name, or slug) to a term ID within
+         * the given taxonomy. Returns 0 when no matching term is found.
+         */
+        private function resolve_term( $value, $taxonomy ){
+            $value = trim( $value );
+
+            foreach( ['id', 'name', 'slug'] as $by ){
+                $term = get_term_by( $by, $value, $taxonomy );
+                if( $term ){
+                    return $term->term_id;
                 }
             }
 
-            // Delete the temporary meta value.
-            delete_post_meta($post_id, 'rank_math_product_cat_temp');
+            return 0;
         }
     }
 }

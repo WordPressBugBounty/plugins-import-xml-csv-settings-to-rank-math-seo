@@ -52,8 +52,14 @@ if( !class_exists('WPAI_RankMath_SEO_Helpers')) {
                 $custom_type = $import_options_arr['custom_type'];
             } else {
                 // If this is a new import get the custom post type data from the current session
-                $import_options = $wpdb->get_row( $wpdb->prepare("SELECT option_name, option_value FROM $wpdb->options WHERE option_name = %s", '_wpallimport_session_' . $import_id . '_'), ARRAY_A );
-                $import_options_arr = empty($import_options) ? array() : unserialize($import_options['option_value']);
+                $handler            = $this->fetch_handler();
+                if ( $handler === false ) {
+                    return $custom_type;
+                }
+                
+                $import_options_arr = $handler->get_session_data();
+                
+                
                 $custom_type = empty($import_options_arr['custom_type']) ? '' : $import_options_arr['custom_type'];
             }
 
@@ -67,7 +73,7 @@ if( !class_exists('WPAI_RankMath_SEO_Helpers')) {
              * Show fields based on post type
              **/
 
-            $custom_type = false;
+            $taxonomy_type = false;
 
             if ( ! empty( $argv ) ) {
                 if ( isset( $argv[3] ) ) {
@@ -103,12 +109,49 @@ if( !class_exists('WPAI_RankMath_SEO_Helpers')) {
                 $taxonomy_type = $import_options_arr['taxonomy_type'];
             } else {
                 // If this is a new import get the custom post type data from the current session
-                $import_options = $wpdb->get_row( $wpdb->prepare("SELECT option_name, option_value FROM $wpdb->options WHERE option_name = %s", '_wpallimport_session_' . $import_id . '_'), ARRAY_A );
-                $import_options_arr = empty($import_options) ? array() : unserialize($import_options['option_value']);
+                $handler            = $this->fetch_handler();
+                if ( $handler === false ) {
+                    return $taxonomy_type;
+                }
+                
+                $import_options_arr = $handler->get_session_data();
+                
+                
                 $taxonomy_type = empty($import_options_arr['taxonomy_type']) ? '' : $import_options_arr['taxonomy_type'];
             }
 
             return $taxonomy_type;
+        }
+
+        public function fetch_handler() {
+            // is_plugin_active() lives in wp-admin/includes/plugin.php, which is not
+            // loaded on the front end (e.g. cron or import_key triggered imports).
+            if ( ! function_exists( 'is_plugin_active' ) ) {
+                require_once ABSPATH . 'wp-admin/includes/plugin.php';
+            }
+
+            // Check if Pro version is active
+            if ( is_plugin_active( 'wp-all-import-pro/wp-all-import-pro.php' ) ) {
+                $folder = 'wp-all-import-pro';
+            } elseif ( is_plugin_active('wp-all-import/plugin.php' ) ) {
+                $folder = 'wp-all-import';
+            } else {
+                return false;
+            }
+
+            $class_paths = [
+                WP_PLUGIN_DIR . '/' . $folder . '/classes/session.php',
+                WP_PLUGIN_DIR . '/' . $folder . '/classes/input.php',
+                WP_PLUGIN_DIR . '/' . $folder . '/classes/handler.php'
+            ];
+
+            foreach ( $class_paths as $path ) {
+                require_once( $path );
+            }
+
+            $handler = new PMXI_Handler();
+            return $handler;
+            
         }
 
 

@@ -3,10 +3,10 @@ Contributors: soflyy, wpallimport
 Tags: seo, import seo, search engine optimization, import search engine optimization, import rankmath
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
-Requires at least: 4.9
-Requires PHP: 5.6
-Tested up to: 6.9
-Stable tag: 1.1
+Requires at least: 5.0
+Requires PHP: 7.4
+Tested up to: 7.0
+Stable tag: 1.2
 
 Drag & drop to import from any CSV, Excel, XML, or Google Sheets file into Rank Math SEO's titles, meta descriptions, focus keywords, schema settings and more.
 
@@ -68,6 +68,17 @@ To install the Rank Math Add-On, either:
 The Rank Math Add-On will appear in the Step 3 of [WP All Import](https://www.wpallimport.com/wordpress-xml-csv-import/).
 
 == Changelog ==
+
+= 1.2 =
+* improvement: use WP All Import's built-in RapidAddon instead of a bundled copy
+* improvement: set the primary term on import for any post type, not just WooCommerce products
+* bug fix: correctly detect post and taxonomy type for new imports
+* bug fix: prevent a fatal error when WP All Import is not active
+* bug fix: schema field labels not hidden when Schema Type is set to None
+* bug fix: don't set Product "Price Valid Until" and other date fields to 1970-01-01 when the source value is empty
+* bug fix: don't create an "Off" schema when the Schema Type is set to None
+* bug fix: remove empty values from generated schema so Rank Math falls back to its defaults
+* bug fix: prevent "Undefined array key" notices when importing schema with unmapped fields
 
 = 1.1.0 =
 * improvement: add support for new schema format implemented by Rank Math

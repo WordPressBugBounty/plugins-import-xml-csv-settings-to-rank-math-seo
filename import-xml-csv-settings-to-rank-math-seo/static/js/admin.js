@@ -244,13 +244,15 @@ window.onload = function()
             function hideFields(fields, type = ''){
                 if(type === 'parentparent'){
                     jQuery.each(fields, function(index, item) {
-                        $('label[for=' + 'rank_math_seo_addon' + item +'],#rank_math_seo_addon' + item).parent().parent().hide();
+                        $('label[for=\'' + 'rank_math_seo_addon' + item +'\'],#rank_math_seo_addon' + item).parent().parent().hide();
 
                     });
 
                 }else{
                     jQuery.each(fields, function(index, item) {
-                        $('label[for=' + 'rank_math_seo_addon' + item +'],#rank_math_seo_addon' + item).hide();
+                        // Match the label whether WP All Import renders for="rank_math_seo_addon<field>"
+                        // (Pro) or the bracketed for="rank_math_seo_addon[<field>]" (Free).
+                        $('label[for=\'' + 'rank_math_seo_addon' + item +'\'],label[for=\'rank_math_seo_addon[' + item + ']\'],#rank_math_seo_addon' + item).hide();
                         // hide tooltips
                         $('a[data*=\''+ item +'\'], a[original-title*=\''+ item +'\'], a[title*=\''+ item +'\']').hide();
                     });
@@ -269,7 +271,7 @@ window.onload = function()
                 if(type === 'parentparent'){
                     jQuery.each(fields, function(index, item) {
 
-                        $('label[for=' + 'rank_math_seo_addon' + item + '],#rank_math_seo_addon' + item).parent().parent().show();
+                        $('label[for=\'' + 'rank_math_seo_addon' + item +'\'],#rank_math_seo_addon' + item).parent().parent().show();
 
                         if(item === 'rank_math_schema_woocommerce_product_xpath') {
                             $('label[for=rank_math_seo_addonrank_math_schema_woocommerce_product_xpath],#rank_math_seo_addonrank_math_schema_woocommerce_product_xpath').hide();
@@ -278,7 +280,7 @@ window.onload = function()
 
                 }else{
                     jQuery.each(fields, function(index, item) {
-                        $('label[for=' + 'rank_math_seo_addon' + item +'],#rank_math_seo_addon' + item).show();
+                        $('label[for=\'' + 'rank_math_seo_addon' + item +'\'],label[for=\'rank_math_seo_addon[' + item + ']\'],#rank_math_seo_addon' + item).show();
                         // show tooltips
                         $('a[data*=\''+ item +'\'], a[original-title*=\''+ item +'\'], a[title*=\''+ item +'\']').show();
                     });

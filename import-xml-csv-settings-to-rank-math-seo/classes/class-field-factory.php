@@ -9,7 +9,7 @@ if( !class_exists('WPAI_RankMath_SEO_Field_Factory')) {
         protected $post_type;
         protected $taxonomy_type;
 
-        public function __construct( Soflyy\WpAllImportRapidAddon\RapidAddon $addon_obj)
+        public function __construct( RapidAddon $addon_obj)
         {
             $this->add_on = $addon_obj;
 
@@ -40,10 +40,23 @@ if( !class_exists('WPAI_RankMath_SEO_Field_Factory')) {
                 );
             }
 
-            if( $this->post_type == 'product'){
-
-                $this->add_on->add_field('rank_math_primary_product_cat', 'Primary Product Category', 'text', null, 'Provide the name, slug, or ID of a category assigned to the product.');
-
+            // Rank Math supports a single primary taxonomy per post type, configured
+            // under Titles & Meta (titles.pt_{post_type}_primary_taxonomy) and stored
+            // as rank_math_primary_{taxonomy}. Offer one field for exactly that
+            // taxonomy so the import matches what Rank Math actually honors.
+            if( $this->post_type && function_exists('post_type_exists') && post_type_exists($this->post_type) && !in_array($this->post_type, ['taxonomies', 'import_users', 'shop_customer']) ){
+                $primary_tax = $this->get_primary_taxonomy();
+                if( $primary_tax && taxonomy_exists($primary_tax) ){
+                    $tax = get_taxonomy($primary_tax);
+                    $singular = !empty($tax->labels->singular_name) ? $tax->labels->singular_name : $tax->label;
+                    $this->add_on->add_field(
+                        'rank_math_primary_' . $primary_tax,
+                        'Primary ' . $singular,
+                        'text',
+                        null,
+                        'Provide the name, slug, or ID of a single ' . $singular . ' to set it as the primary term. The term must also be assigned to the imported item (in the "Taxonomies, Categories & Tags" section), since Rank Math only uses the primary term if it is one of the item\'s terms. Uses the Primary Taxonomy configured for this post type in Rank Math.'
+                    );
+                }
             }
 
             // Build the field array for Facebook Options
@@ -345,6 +358,31 @@ if( !class_exists('WPAI_RankMath_SEO_Field_Factory')) {
                     ));
 
             }
+        }
+
+        /**
+         * The taxonomy Rank Math treats as primary for this post type, from its
+         * Titles & Meta setting (titles.pt_{post_type}_primary_taxonomy). Returns ''
+         * when none is configured ('off'), so no primary-term field is offered.
+         */
+        private function get_primary_taxonomy(){
+            $setting = 'pt_' . $this->post_type . '_primary_taxonomy';
+
+            if( class_exists('RankMath\\Helper') ){
+                $value = \RankMath\Helper::get_settings( 'titles.' . $setting );
+                if( !empty($value) ){
+                    return 'off' === $value ? '' : $value;
+                }
+            }
+
+            $titles = get_option( 'rank_math_titles', [] );
+            if( is_array($titles) && !empty($titles[ $setting ]) ){
+                return 'off' === $titles[ $setting ] ? '' : $titles[ $setting ];
+            }
+
+            // Rank Math's built-in defaults, for sites where the option isn't initialised yet.
+            $defaults = [ 'post' => 'category', 'product' => 'product_cat' ];
+            return isset($defaults[ $this->post_type ]) ? $defaults[ $this->post_type ] : '';
         }
     }
 }

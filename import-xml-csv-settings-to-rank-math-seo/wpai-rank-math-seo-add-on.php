@@ -2,7 +2,7 @@
 /*
 Plugin Name: WP All Import - Rank Math SEO Add-On
 Description: An add-on to facilitate importing to Rank Math using WP All Import.
-Version: 1.1
+Version: 1.2
 Author: WP All Import
 */
 
@@ -14,7 +14,7 @@ final class Rank_Math_Seo_Add_On {
     /**
      * @var string
      */
-    protected static $version = '1.1';
+    protected static $version = '1.2';
 
     /**
      * Singletone instance.
@@ -27,6 +27,18 @@ final class Rank_Math_Seo_Add_On {
      * @var RapidAddon
      */
     protected $add_on;
+
+    /**
+     * Add On name.
+     * @var string
+     */
+    protected $addon_name = 'Rank Math SEO Add-On';
+
+    /**
+     * Add On slug.
+     * @var string
+     */
+    protected $addon_slug = 'rank_math_seo_addon';
 
     /**
      * Return singletone instance.
@@ -57,6 +69,14 @@ final class Rank_Math_Seo_Add_On {
         if( is_admin() || php_sapi_name() === 'cli' || isset($_GET['import_key'])) {
 
             $this->constants();
+
+            // WP All Import must be active before we include the RapidAddon shim, which
+            // extends PMXI_RapidAddon — including it without WPAI present is a fatal error.
+            if(!class_exists('PMXI_Plugin') || !class_exists('PMXI_RapidAddon')){
+                add_action( 'admin_notices', [ $this, 'show_missing_wpai_notice' ] );
+                return;
+            }
+
             $this->includes();
 
             // Make sure the add-on should run for this import type
@@ -68,9 +88,9 @@ final class Rank_Math_Seo_Add_On {
 
             add_action( 'admin_enqueue_scripts', [ $this, 'rank_math_seo_admin_scripts' ] );
 
-            $this->add_on = new Soflyy\WpAllImportRapidAddon\RapidAddon( 'Rank Math SEO Add-On', 'rank_math_seo_addon' );
+            $this->add_on = new RapidAddon( $this->addon_name, $this->addon_slug );
 
-            $fields = new WPAI_RankMath_SEO_Field_Factory( $this->add_on);
+            $fields = new WPAI_RankMath_SEO_Field_Factory( $this->add_on );
 
             $this->filters();
 
@@ -121,29 +141,47 @@ final class Rank_Math_Seo_Add_On {
     }
 
     private function includes(){
-        include WPAI_PLUGIN_DIR_PATH . "rapid-addon.php";
-        include_once WPAI_PLUGIN_DIR_PATH . 'classes/class-field-factory.php';
-        include_once WPAI_PLUGIN_DIR_PATH . 'classes/class-importer.php';
-        include_once WPAI_PLUGIN_DIR_PATH . 'classes/class-helpers.php';
-	    include_once WPAI_PLUGIN_DIR_PATH . 'classes/class-schema.php';
+        include WPAI_RANK_MATH_SEO_DIR_PATH . 'classes/class-rapid-add-on.php';
+        include_once WPAI_RANK_MATH_SEO_DIR_PATH . 'classes/class-field-factory.php';
+        include_once WPAI_RANK_MATH_SEO_DIR_PATH . 'classes/class-importer.php';
+        include_once WPAI_RANK_MATH_SEO_DIR_PATH . 'classes/class-helpers.php';
+	    include_once WPAI_RANK_MATH_SEO_DIR_PATH . 'classes/class-schema.php';
     }
 
     public function constants() {
-        if ( ! defined( 'WPAI_PLUGIN_DIR_PATH' ) ) {
+        if ( ! defined( 'WPAI_RANK_MATH_SEO_DIR_PATH' ) ) {
             // Dir path
-            define( 'WPAI_PLUGIN_DIR_PATH', plugin_dir_path( __FILE__ ) );
+            define( 'WPAI_RANK_MATH_SEO_DIR_PATH', plugin_dir_path( __FILE__ ) );
         }
 
-        if ( ! defined( 'WPAI_ROOT_DIR' ) ) {
+        if ( ! defined( 'WPAI_RANK_MATH_SEO_ROOT_DIR' ) ) {
             // Root directory for the plugin.
-            define( 'WPAI_ROOT_DIR', str_replace( '\\', '/', dirname( __FILE__ ) ) );
+            define( 'WPAI_RANK_MATH_SEO_ROOT_DIR', str_replace( '\\', '/', dirname( __FILE__ ) ) );
         }
 
-        if ( ! defined( 'WPAI_PLUGIN_PATH' ) ) {
+        if ( ! defined( 'WPAI_RANK_MATH_SEO_PLUGIN_PATH' ) ) {
             // Path to the main plugin file.
-            define( 'WPAI_PLUGIN_PATH', WPAI_ROOT_DIR . '/' . basename( __FILE__ ) );
+            define( 'WPAI_RANK_MATH_SEO_PLUGIN_PATH', WPAI_RANK_MATH_SEO_ROOT_DIR . '/' . basename( __FILE__ ) );
         }
 
+    }
+
+    public function show_missing_wpai_notice() {
+        $this->pmxi_display_admin_notice($this->addon_name, $this->addon_slug);
+    }
+
+    public function pmxi_display_admin_notice($addon_name, $addon_slug, $notice_text = false) {
+        if (!$notice_text) {
+            $notice_text = $addon_name.' requires the latest version of WP All Import <a href="http://www.wpallimport.com/" target="_blank">Pro</a> or <a href="http://wordpress.org/plugins/wp-all-import" target="_blank">Free</a>.';
+        }
+
+        if (!get_option(sanitize_key($addon_slug).'_notice_ignore')) {
+            ?>
+            <div class="error notice is-dismissible wpallimport-dismissible" style="margin-top: 10px;" rel="<?php echo esc_attr(sanitize_key($addon_slug)); ?>">
+                <p><?php echo \wp_kses_post( $notice_text ); ?></p>
+            </div>
+            <?php
+        }
     }
 
     private function filters(){
